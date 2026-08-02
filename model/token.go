@@ -428,6 +428,37 @@ func DecreaseTokenQuota(id int, key string, quota int) (err error) {
 	return decreaseTokenQuota(id, quota)
 }
 
+// Durable token quota adjustments used by asynchronous direct-relay tickets.
+func IncreaseTokenQuotaDirect(id int, key string, quota int) error {
+	if quota < 0 {
+		return errors.New("quota 不能为负数！")
+	}
+	if err := increaseTokenQuota(id, quota); err != nil {
+		return err
+	}
+	if common.RedisEnabled {
+		if err := cacheIncrTokenQuota(key, int64(quota)); err != nil {
+			common.SysLog("failed to refresh direct-relay token quota cache: " + err.Error())
+		}
+	}
+	return nil
+}
+
+func DecreaseTokenQuotaDirect(id int, key string, quota int) error {
+	if quota < 0 {
+		return errors.New("quota 不能为负数！")
+	}
+	if err := decreaseTokenQuota(id, quota); err != nil {
+		return err
+	}
+	if common.RedisEnabled {
+		if err := cacheIncrTokenQuota(key, -int64(quota)); err != nil {
+			common.SysLog("failed to refresh direct-relay token quota cache: " + err.Error())
+		}
+	}
+	return nil
+}
+
 func decreaseTokenQuota(id int, quota int) (err error) {
 	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
 		map[string]interface{}{

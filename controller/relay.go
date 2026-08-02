@@ -158,6 +158,59 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	// common.SetContextKey(c, constant.ContextKeyTokenCountMeta, meta)
 
+	// Direct relay is probed before ordinary billing. This keeps unsupported
+	// capability requests on the exact legacy trust/batch billing path.
+	originalPriceData := relayInfo.PriceData
+	originalTieredSnapshot := relayInfo.TieredBillingSnapshot
+	originalBillingInput := relayInfo.BillingRequestInput
+	originalUpstreamModel := relayInfo.OriginModelName
+	originalUsingGroup := relayInfo.UsingGroup
+	var preselectedChannel *model.Channel
+	var preselectedBody common.BodyStorage
+	if !priceData.FreeModel && service.ShouldAttemptGeminiDirect(c, relayInfo) {
+		probeRetry := &service.RetryParam{Ctx: c, TokenGroup: relayInfo.TokenGroup, ModelName: relayInfo.OriginModelName, RequestPath: c.Request.URL.Path, Retry: common.GetPointer(0)}
+		if channel, channelErr := getChannel(c, relayInfo, probeRetry); channelErr == nil && channel != nil {
+			if bodyStorage, bodyErr := common.GetBodyStorage(c); bodyErr == nil {
+				c.Request.Body = io.NopCloser(bodyStorage)
+				preselectedChannel = channel
+				preselectedBody = bodyStorage
+				relayInfo.InitChannelMeta(c)
+				if geminiReq, ok := relayInfo.Request.(*dto.GeminiChatRequest); ok {
+					if mapErr := helper.ModelMappedHelper(c, relayInfo, geminiReq); mapErr == nil && service.IsGeminiDirectCandidate(c, relayInfo) {
+						// Channel selection may refresh group metadata. Keep the price
+						// and tiered snapshot frozen at the pre-channel pricing point.
+						relayInfo.PriceData = originalPriceData
+						relayInfo.TieredBillingSnapshot = originalTieredSnapshot
+						relayInfo.BillingRequestInput = originalBillingInput
+						if bodyBytes, bytesErr := bodyStorage.Bytes(); bytesErr == nil {
+							ticket, ticketErr := service.CreateDirectRelayTicket(c, relayInfo, bodyBytes)
+							if ticketErr != nil {
+								newAPIError = types.NewError(ticketErr, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+								return
+							}
+							addUsedChannel(c, channel.Id)
+							c.JSON(http.StatusOK, ticket)
+							return
+						}
+					}
+				}
+			}
+		}
+		// Probe failure or an unsupported channel is an ordinary relay fallback.
+		relayInfo.PriceData = originalPriceData
+		relayInfo.TieredBillingSnapshot = originalTieredSnapshot
+		relayInfo.BillingRequestInput = originalBillingInput
+		relayInfo.OriginModelName = originalUpstreamModel
+		relayInfo.UsingGroup = originalUsingGroup
+		if relayInfo.ChannelMeta != nil {
+			relayInfo.ChannelMeta.IsModelMapped = false
+		}
+		relayInfo.ChannelMeta = nil
+		if relayInfo.Request != nil {
+			relayInfo.Request.SetModelName(originalUpstreamModel)
+		}
+	}
+
 	if priceData.FreeModel {
 		logger.LogInfo(c, fmt.Sprintf("模型 %s 免费，跳过预扣费", relayInfo.OriginModelName))
 	} else {
@@ -190,7 +243,18 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
 		relayInfo.RetryIndex = retryParam.GetRetry()
-		channel, channelErr := getChannel(c, relayInfo, retryParam)
+		var channel *model.Channel
+		var channelErr *types.NewAPIError
+		if retryParam.GetRetry() == 0 && preselectedChannel != nil {
+			channel = preselectedChannel
+			// With an already selected channel, getChannel returns a lightweight
+			// context-backed channel rather than loading the full database record.
+			// Keep the distributor's original context (especially BaseURL and key)
+			// instead of overwriting it with that incomplete object on fallback.
+			relayInfo.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, relayInfo)
+		} else {
+			channel, channelErr = getChannel(c, relayInfo, retryParam)
+		}
 		if channelErr != nil {
 			logger.LogError(c, channelErr.Error())
 			newAPIError = channelErr
@@ -198,7 +262,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 
 		addUsedChannel(c, channel.Id)
-		bodyStorage, bodyErr := common.GetBodyStorage(c)
+		bodyStorage := preselectedBody
+		var bodyErr error
+		if bodyStorage == nil {
+			bodyStorage, bodyErr = common.GetBodyStorage(c)
+		}
 		if bodyErr != nil {
 			// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
 			if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {

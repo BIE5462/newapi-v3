@@ -336,6 +336,8 @@ func GetUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
 		return
 	}
+	geminiDirectRelayEnabled := user.GetSetting().GeminiDirectRelayEnabled
+	user.GeminiDirectRelayEnabled = &geminiDirectRelayEnabled
 	user.AdminPermissions = authz.Capabilities(user.Id, user.Role)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -661,6 +663,17 @@ func UpdateUser(c *gin.Context) {
 	if err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := updatedUser.EditWithTx(tx, updatePassword); err != nil {
 			return err
+		}
+		if updatedUser.GeminiDirectRelayEnabled != nil {
+			setting := originUser.GetSetting()
+			setting.GeminiDirectRelayEnabled = *updatedUser.GeminiDirectRelayEnabled
+			data, marshalErr := common.Marshal(setting)
+			if marshalErr != nil {
+				return marshalErr
+			}
+			if err := tx.Model(&model.User{}).Where("id = ?", updatedUser.Id).Update("setting", string(data)).Error; err != nil {
+				return err
+			}
 		}
 		touched, err := updateAdminPermissionsForUserInTx(c, tx, updatedUser.Id, originUser.Role, updatedUser.AdminPermissions)
 		authzTouched = touched

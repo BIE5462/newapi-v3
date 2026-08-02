@@ -54,6 +54,9 @@ type User struct {
 	CreatedAt        int64                      `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt      int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 	AdminPermissions map[string]map[string]bool `json:"admin_permissions,omitempty" gorm:"-:all"`
+	// GeminiDirectRelayEnabled is stored in the user settings JSON. Keep this
+	// transient field for the admin user API and classic frontend form.
+	GeminiDirectRelayEnabled *bool `json:"gemini_direct_relay_enabled,omitempty" gorm:"-"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -953,6 +956,35 @@ func DecreaseUserQuota(id int, quota int, db bool) (err error) {
 	return decreaseUserQuota(id, quota)
 }
 
+// Durable quota adjustments used by asynchronous ticket settlement. These
+// bypass the optional batch queue so the ticket's reserve is committed before
+// its callback can be processed.
+func IncreaseUserQuotaDirect(id int, quota int) error {
+	if quota < 0 {
+		return errors.New("quota 不能为负数！")
+	}
+	if err := increaseUserQuota(id, quota); err != nil {
+		return err
+	}
+	if err := cacheIncrUserQuota(id, int64(quota)); err != nil {
+		common.SysLog("failed to refresh direct-relay user quota cache: " + err.Error())
+	}
+	return nil
+}
+
+func DecreaseUserQuotaDirect(id int, quota int) error {
+	if quota < 0 {
+		return errors.New("quota 不能为负数！")
+	}
+	if err := decreaseUserQuota(id, quota); err != nil {
+		return err
+	}
+	if err := cacheIncrUserQuota(id, -int64(quota)); err != nil {
+		common.SysLog("failed to refresh direct-relay user quota cache: " + err.Error())
+	}
+	return nil
+}
+
 func decreaseUserQuota(id int, quota int) (err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota - ?", quota)).Error
 	if err != nil {
@@ -994,6 +1026,12 @@ func UpdateUserUsedQuotaAndRequestCount(id int, quota int) {
 		addNewRecord(BatchUpdateTypeRequestCount, id, 1)
 		return
 	}
+	updateUserUsedQuotaAndRequestCount(id, quota, 1)
+}
+
+// UpdateUserUsedQuotaAndRequestCountDirect commits direct-relay usage
+// counters immediately; these counters must not wait for the batch updater.
+func UpdateUserUsedQuotaAndRequestCountDirect(id int, quota int) {
 	updateUserUsedQuotaAndRequestCount(id, quota, 1)
 }
 

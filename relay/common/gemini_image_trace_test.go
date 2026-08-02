@@ -33,9 +33,9 @@ func TestIsGeminiImageTraceRequestMatchesGeminiImageEndpoint(t *testing.T) {
 	require.True(t, IsGeminiImageTraceRequest(&RelayInfo{
 		RelayMode: relayconstant.RelayModeImagesGenerations,
 		ChannelMeta: &ChannelMeta{
-			ApiType: constant.APITypeGemini,
+			ApiType:           constant.APITypeGemini,
+			UpstreamModelName: "imagen-4.0-generate-preview-06-06",
 		},
-		UpstreamModelName: "imagen-4.0-generate-preview-06-06",
 	}))
 }
 
@@ -47,11 +47,11 @@ func TestIsGeminiImageTraceRequestMatchesSupportedImagineModelWithoutImageName(t
 	}()
 
 	require.True(t, IsGeminiImageTraceRequest(&RelayInfo{
-		RelayMode:        relayconstant.RelayModeGemini,
-		RequestURLPath:   "/v1beta/models/gemini-2.0-flash-exp:generateContent",
-		UpstreamModelName: "gemini-2.0-flash-exp",
+		RelayMode:      relayconstant.RelayModeGemini,
+		RequestURLPath: "/v1beta/models/gemini-2.0-flash-exp:generateContent",
 		ChannelMeta: &ChannelMeta{
-			ApiType: constant.APITypeGemini,
+			ApiType:           constant.APITypeGemini,
+			UpstreamModelName: "gemini-2.0-flash-exp",
 		},
 	}))
 }
@@ -64,11 +64,11 @@ func TestIsGeminiImageTraceRequestSkipsPlainGeminiTextModel(t *testing.T) {
 	}()
 
 	require.False(t, IsGeminiImageTraceRequest(&RelayInfo{
-		RelayMode:        relayconstant.RelayModeGemini,
-		RequestURLPath:   "/v1beta/models/gemini-2.5-pro:generateContent",
-		UpstreamModelName: "gemini-2.5-pro",
+		RelayMode:      relayconstant.RelayModeGemini,
+		RequestURLPath: "/v1beta/models/gemini-2.5-pro:generateContent",
 		ChannelMeta: &ChannelMeta{
-			ApiType: constant.APITypeGemini,
+			ApiType:           constant.APITypeGemini,
+			UpstreamModelName: "gemini-2.5-pro",
 		},
 	}))
 }
@@ -81,11 +81,11 @@ func TestIsGeminiImageTraceRequestSkipsOpenAIChatCompletions(t *testing.T) {
 	}()
 
 	require.False(t, IsGeminiImageTraceRequest(&RelayInfo{
-		RelayMode:        relayconstant.RelayModeChatCompletions,
-		RequestURLPath:   "/v1/chat/completions",
-		UpstreamModelName: "gemini-2.5-flash-image",
+		RelayMode:      relayconstant.RelayModeChatCompletions,
+		RequestURLPath: "/v1/chat/completions",
 		ChannelMeta: &ChannelMeta{
-			ApiType: constant.APITypeGemini,
+			ApiType:           constant.APITypeGemini,
+			UpstreamModelName: "gemini-2.5-flash-image",
 		},
 	}))
 }

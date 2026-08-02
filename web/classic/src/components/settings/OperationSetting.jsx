@@ -27,6 +27,7 @@ import SettingsLog from '../../pages/Setting/Operation/SettingsLog';
 import SettingsMonitoring from '../../pages/Setting/Operation/SettingsMonitoring';
 import SettingsCreditLimit from '../../pages/Setting/Operation/SettingsCreditLimit';
 import SettingsCheckin from '../../pages/Setting/Operation/SettingsCheckin';
+import SettingsGeminiDirectRelay from '../../pages/Setting/Operation/SettingsGeminiDirectRelay';
 import { API, showError, toBoolean } from '../../helpers';
 
 const OperationSetting = () => {
@@ -49,6 +50,9 @@ const OperationSetting = () => {
     DefaultCollapseSidebar: false,
     DemoSiteEnabled: false,
     SelfUseModeEnabled: false,
+    GeminiDirectRelayEnabled: false,
+    GeminiDirectTicketTTLSeconds: 600,
+    GeminiDirectCallbackGraceSeconds: 1800,
 
     /* 顶栏模块管理 */
     HeaderNavModules: '',
@@ -125,6 +129,9 @@ const OperationSetting = () => {
         {/* 通用设置 */}
         <Card style={{ marginTop: '10px' }}>
           <SettingsGeneral options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsGeminiDirectRelay options={inputs} refresh={onRefresh} />
         </Card>
         {/* 顶栏模块管理 */}
         <div style={{ marginTop: '10px' }}>

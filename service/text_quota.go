@@ -83,7 +83,11 @@ func isLegacyClaudeDerivedOpenAIUsage(relayInfo *relaycommon.RelayInfo, usage *d
 
 func calculateTextToolCallSurcharge(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, summary *textQuotaSummary) decimal.Decimal {
 	dGroupRatio := decimal.NewFromFloat(summary.GroupRatio)
-	dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+	quotaPerUnit := common.QuotaPerUnit
+	if relayInfo.BillingQuotaPerUnit > 0 {
+		quotaPerUnit = relayInfo.BillingQuotaPerUnit
+	}
+	dQuotaPerUnit := decimal.NewFromFloat(quotaPerUnit)
 
 	var surcharge decimal.Decimal
 
@@ -223,7 +227,11 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	dCacheCreationRatio := decimal.NewFromFloat(summary.CacheCreationRatio)
 	dCacheCreationRatio5m := decimal.NewFromFloat(summary.CacheCreationRatio5m)
 	dCacheCreationRatio1h := decimal.NewFromFloat(summary.CacheCreationRatio1h)
-	dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+	quotaPerUnit := common.QuotaPerUnit
+	if relayInfo.BillingQuotaPerUnit > 0 {
+		quotaPerUnit = relayInfo.BillingQuotaPerUnit
+	}
+	dQuotaPerUnit := decimal.NewFromFloat(quotaPerUnit)
 
 	ratio := dModelRatio.Mul(dGroupRatio)
 	summary.ToolCallSurchargeQuota = calculateTextToolCallSurcharge(ctx, relayInfo, &summary)

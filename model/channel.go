@@ -867,6 +867,12 @@ func UpdateChannelUsedQuota(id int, quota int) {
 	updateChannelUsedQuota(id, quota)
 }
 
+// UpdateChannelUsedQuotaDirect commits direct-relay usage immediately instead
+// of placing it in the optional batch queue.
+func UpdateChannelUsedQuotaDirect(id int, quota int) {
+	updateChannelUsedQuota(id, quota)
+}
+
 func updateChannelUsedQuota(id int, quota int) {
 	err := DB.Model(&Channel{}).Where("id = ?", id).Update("used_quota", gorm.Expr("used_quota + ?", quota)).Error
 	if err != nil {

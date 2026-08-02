@@ -85,6 +85,51 @@ func (logCleanupHandler) Run(ctx context.Context, task *model.SystemTask, runner
 
 func init() {
 	RegisterSystemTaskHandler(logCleanupHandler{})
+	RegisterSystemTaskHandler(directRelayRefundHandler{})
+}
+
+type directRelayRefundHandler struct{}
+
+func (directRelayRefundHandler) Type() string            { return model.SystemTaskTypeDirectRelayRefund }
+func (directRelayRefundHandler) Enabled() bool           { return true }
+func (directRelayRefundHandler) Interval() time.Duration { return time.Minute }
+func (directRelayRefundHandler) NewPayload() any         { return nil }
+func (directRelayRefundHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	tickets, err := model.FindExpiredDirectRelayTickets(common.GetTimestamp(), 100)
+	if err != nil {
+		_ = model.FinishSystemTask(task.TaskID, runnerID, model.SystemTaskStatusFailed, nil, err.Error())
+		return
+	}
+	refunded := 0
+	recoveredSettled := 0
+	callbackRiskRefunds := 0
+	failed := 0
+	for _, ticket := range tickets {
+		if ctx.Err() != nil {
+			_ = model.FinishSystemTask(task.TaskID, runnerID, model.SystemTaskStatusFailed, map[string]int{"refunded": refunded, "settled_recovered": recoveredSettled, "callback_risk_refunds": callbackRiskRefunds, "failed": failed}, ctx.Err().Error())
+			return
+		}
+		status, recoverErr := recoverExpiredDirectRelayTicket(ticket)
+		if recoverErr != nil {
+			failed++
+			logger.LogError(ctx, fmt.Sprintf("failed to recover expired direct-relay ticket %s: %v", ticket.TicketID, recoverErr))
+			continue
+		}
+		switch status {
+		case model.DirectRelayTicketRefunded:
+			refunded++
+			// An issued ticket may already have reached Gemini before the
+			// callback was lost. Settling is also a possible in-flight success
+			// state. Count both as the financial-risk metric described by the
+			// direct-relay protocol.
+			if ticket.Status == model.DirectRelayTicketIssued || ticket.Status == model.DirectRelayTicketSettling {
+				callbackRiskRefunds++
+			}
+		case model.DirectRelayTicketSettled:
+			recoveredSettled++
+		}
+	}
+	_ = model.FinishSystemTask(task.TaskID, runnerID, model.SystemTaskStatusSucceeded, map[string]int{"refunded": refunded, "settled_recovered": recoveredSettled, "callback_risk_refunds": callbackRiskRefunds, "failed": failed}, "")
 }
 
 type LogCleanupPayload struct {

@@ -162,6 +162,9 @@ type RelayInfo struct {
 	UpstreamRequestBodySize int64
 
 	PriceData types.PriceData
+	// BillingQuotaPerUnit freezes quota conversion for asynchronous settlement.
+	// Zero keeps the existing behavior of reading common.QuotaPerUnit.
+	BillingQuotaPerUnit float64
 
 	// TieredBillingSnapshot is a frozen snapshot of tiered billing rules
 	// captured at pre-consume time. Non-nil only when billing mode is "tiered_expr".

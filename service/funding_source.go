@@ -28,7 +28,8 @@ type FundingSource interface {
 
 type WalletFunding struct {
 	userId   int
-	consumed int // 实际预扣的用户额度
+	consumed int  // 实际预扣的用户额度
+	durable  bool // direct-relay reserves bypass the batch quota queue
 }
 
 func (w *WalletFunding) Source() string { return BillingSourceWallet }
@@ -37,7 +38,13 @@ func (w *WalletFunding) PreConsume(amount int) error {
 	if amount <= 0 {
 		return nil
 	}
-	if err := model.DecreaseUserQuota(w.userId, amount, false); err != nil {
+	var err error
+	if w.durable {
+		err = model.DecreaseUserQuotaDirect(w.userId, amount)
+	} else {
+		err = model.DecreaseUserQuota(w.userId, amount, false)
+	}
+	if err != nil {
 		return err
 	}
 	w.consumed = amount
@@ -49,7 +56,13 @@ func (w *WalletFunding) Settle(delta int) error {
 		return nil
 	}
 	if delta > 0 {
+		if w.durable {
+			return model.DecreaseUserQuotaDirect(w.userId, delta)
+		}
 		return model.DecreaseUserQuota(w.userId, delta, false)
+	}
+	if w.durable {
+		return model.IncreaseUserQuotaDirect(w.userId, -delta)
 	}
 	return model.IncreaseUserQuota(w.userId, -delta, false)
 }
@@ -60,6 +73,9 @@ func (w *WalletFunding) Refund() error {
 	}
 	// IncreaseUserQuota 是 quota += N 的非幂等操作，不能重试，否则会多退额度。
 	// 订阅的 RefundSubscriptionPreConsume 有 requestId 幂等保护所以可以重试。
+	if w.durable {
+		return model.IncreaseUserQuotaDirect(w.userId, w.consumed)
+	}
 	return model.IncreaseUserQuota(w.userId, w.consumed, false)
 }
 
