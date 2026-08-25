@@ -4142,7 +4142,7 @@
     "Store + product created": "ストア + 商品を作成しました",
     "Store ID": "ストア ID",
     "Store ID is required": "ストア ID は必須です",
-    "Store large Gemini inlineData images in object storage and return fileData links to reduce API response bandwidth.": "大きな Gemini inlineData 画像をオブジェクトストレージに保存し、fileData リンクを返して API レスポンス帯域を削減します。",
+    "Store large Gemini inlineData and OpenAI b64_json images in object storage, returning fileData or URL links to reduce API response bandwidth.": "大きな Gemini inlineData および OpenAI b64_json 画像をオブジェクトストレージに保存し、fileData または URL リンクを返して API レスポンス帯域を削減します。",
     "Stored value is not echoed back for security": "セキュリティのため、保存済みの値は表示されません",
     "stream": "ストリーム",
     "Stream": "ストリーム",

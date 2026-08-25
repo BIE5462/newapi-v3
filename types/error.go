@@ -88,14 +88,15 @@ const (
 )
 
 type NewAPIError struct {
-	Err            error
-	RelayError     any
-	skipRetry      bool
-	recordErrorLog *bool
-	errorType      ErrorType
-	errorCode      ErrorCode
-	StatusCode     int
-	Metadata       json.RawMessage
+	Err               error
+	RelayError        any
+	skipRetry         bool
+	unmaskClientError bool
+	recordErrorLog    *bool
+	errorType         ErrorType
+	errorCode         ErrorCode
+	StatusCode        int
+	Metadata          json.RawMessage
 }
 
 // Unwrap enables errors.Is / errors.As to work with NewAPIError by exposing the underlying error.
@@ -201,7 +202,7 @@ func (e *NewAPIError) ToOpenAIError() OpenAIError {
 			Code:    e.errorCode,
 		}
 	}
-	if e.errorCode != ErrorCodeCountTokenFailed {
+	if e.errorCode != ErrorCodeCountTokenFailed && !e.unmaskClientError {
 		result.Message = common.MaskSensitiveInfo(result.Message)
 	}
 	if result.Message == "" {
@@ -230,7 +231,7 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 			Type:    string(e.errorType),
 		}
 	}
-	if e.errorCode != ErrorCodeCountTokenFailed {
+	if e.errorCode != ErrorCodeCountTokenFailed && !e.unmaskClientError {
 		result.Message = common.MaskSensitiveInfo(result.Message)
 	}
 	if result.Message == "" {
@@ -402,6 +403,16 @@ func ErrOptionWithHideErrMsg(replaceStr string) NewAPIErrorOptions {
 			fmt.Printf("ErrOptionWithHideErrMsg: %s, origin error: %s", replaceStr, e.Err)
 		}
 		e.Err = errors.New(replaceStr)
+	}
+}
+
+// ErrOptionWithUnmaskedErrorMessage keeps the client-facing error message
+// unchanged. Use this only when the URL or other detail is required to
+// diagnose a user-visible remote resource failure; server-side error logs
+// continue to use MaskSensitiveError and remain redacted.
+func ErrOptionWithUnmaskedErrorMessage() NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		e.unmaskClientError = true
 	}
 }
 

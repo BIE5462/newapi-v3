@@ -51,6 +51,7 @@ const OperationSetting = () => {
     DemoSiteEnabled: false,
     SelfUseModeEnabled: false,
     GeminiDirectRelayEnabled: false,
+    GeminiDirectRelayGlobalEnabled: false,
     GeminiDirectTicketTTLSeconds: 600,
     GeminiDirectCallbackGraceSeconds: 1800,
 

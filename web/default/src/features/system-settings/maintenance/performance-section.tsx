@@ -559,7 +559,7 @@ export function PerformanceSection(props: Props) {
             </h4>
             <p className='text-muted-foreground mt-1 text-xs'>
               {t(
-                'Store large Gemini inlineData images in object storage and return fileData links to reduce API response bandwidth.'
+                'Store large Gemini inlineData and OpenAI b64_json images in object storage, returning fileData or URL links to reduce API response bandwidth.'
               )}
             </p>
           </div>

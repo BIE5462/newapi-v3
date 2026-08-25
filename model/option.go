@@ -157,6 +157,11 @@ func InitOptionMap() {
 	common.OptionMap["QuotaPerUnit"] = strconv.FormatFloat(common.QuotaPerUnit, 'f', -1, 64)
 	common.OptionMap["RetryTimes"] = strconv.Itoa(common.RetryTimes)
 	common.OptionMap["GeminiDirectRelayEnabled"] = "false"
+	// When enabled, eligible Gemini requests may use direct relay without
+	// requiring the per-user GeminiDirectRelayEnabled setting. Keep this
+	// separate from GeminiDirectRelayEnabled, which remains the server-wide
+	// master switch for the feature.
+	common.OptionMap["GeminiDirectRelayGlobalEnabled"] = "false"
 	common.OptionMap["GeminiDirectTicketTTLSeconds"] = "600"
 	common.OptionMap["GeminiDirectCallbackGraceSeconds"] = "1800"
 	common.OptionMap["DataExportInterval"] = strconv.Itoa(common.DataExportInterval)

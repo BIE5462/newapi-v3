@@ -4142,7 +4142,7 @@
     "Store + product created": "Đã tạo cửa hàng + sản phẩm",
     "Store ID": "Mã cửa hàng",
     "Store ID is required": "Bắt buộc nhập Store ID",
-    "Store large Gemini inlineData images in object storage and return fileData links to reduce API response bandwidth.": "Lưu ảnh Gemini inlineData lớn vào lưu trữ đối tượng và trả về liên kết fileData để giảm băng thông phản hồi API.",
+    "Store large Gemini inlineData and OpenAI b64_json images in object storage, returning fileData or URL links to reduce API response bandwidth.": "Lưu các ảnh Gemini inlineData và OpenAI b64_json lớn vào bộ nhớ đối tượng, rồi trả về liên kết fileData hoặc URL để giảm băng thông phản hồi API.",
     "Stored value is not echoed back for security": "Vì bảo mật, giá trị đã lưu không được hiển thị lại",
     "stream": "dòng",
     "Stream": "Luồng",

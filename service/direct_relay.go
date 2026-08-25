@@ -126,6 +126,17 @@ func directRelayEnabled() bool {
 	return err == nil && parsed
 }
 
+// directRelayGlobalEnabled allows the server administrator to authorize
+// direct relay for every user while preserving the existing per-user switch.
+// GeminiDirectRelayEnabled remains the master switch and is still required.
+func directRelayGlobalEnabled() bool {
+	common.OptionMapRWMutex.RLock()
+	value := common.OptionMap["GeminiDirectRelayGlobalEnabled"]
+	common.OptionMapRWMutex.RUnlock()
+	parsed, err := strconv.ParseBool(value)
+	return err == nil && parsed
+}
+
 func directRelaySeconds(key string, fallback, min, max int) int {
 	common.OptionMapRWMutex.RLock()
 	raw := common.OptionMap[key]
@@ -148,7 +159,7 @@ func DirectRelayCallbackGraceSeconds() int {
 // eligibility. It never changes billing state; only a later fully qualified
 // channel may issue an atomic direct ticket.
 func ShouldAttemptGeminiDirect(c *gin.Context, info *relaycommon.RelayInfo) bool {
-	if c == nil || info == nil || !directRelayEnabled() || !info.UserSetting.GeminiDirectRelayEnabled {
+	if c == nil || info == nil || !directRelayEnabled() || (!directRelayGlobalEnabled() && !info.UserSetting.GeminiDirectRelayEnabled) {
 		return false
 	}
 	if info.RelayFormat != types.RelayFormatGemini {
@@ -296,7 +307,8 @@ func CreateDirectRelayTicket(c *gin.Context, info *relaycommon.RelayInfo, reques
 	callbackURL := strings.TrimRight(GetCallbackAddress(), "/") + "/api/direct-relay/gemini/callback"
 	ticket := &model.DirectRelayTicket{
 		TicketID: ticketID, AttemptID: attemptID, RequestID: info.RequestId, UserID: info.UserId,
-		TokenID: info.TokenId, TokenKey: info.TokenKey, ChannelID: info.ChannelId, ChannelType: info.ChannelType,
+		Username: c.GetString("username"),
+		TokenID:  info.TokenId, TokenKey: info.TokenKey, ChannelID: info.ChannelId, ChannelType: info.ChannelType,
 		ChannelMultiKeyIdx: info.ChannelMultiKeyIndex, BillingSource: info.BillingSource, SubscriptionID: info.SubscriptionId,
 		OriginModel: info.OriginModelName, UpstreamModel: info.UpstreamModelName, RequestPath: c.Request.URL.Path,
 		Action: "generateContent", UpstreamURL: urlValue, UpstreamAPIKey: info.ApiKey,
@@ -367,7 +379,7 @@ func SetDirectRelayCallbackContext(c *gin.Context, ticket *model.DirectRelayTick
 	c.Set("channel_id", ticket.ChannelID)
 	c.Set("original_model", ticket.OriginModel)
 	c.Set("group", ticket.UsingGroup)
-	c.Set("username", ticket.TokenName)
+	c.Set("username", ticket.Username)
 	c.Set(common.UpstreamRequestIdKey, ticket.UpstreamRequestID)
 }
 

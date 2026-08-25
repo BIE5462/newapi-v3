@@ -4142,7 +4142,7 @@
     "Store + product created": "Магазин и продукт созданы",
     "Store ID": "ID магазина",
     "Store ID is required": "Требуется ID магазина",
-    "Store large Gemini inlineData images in object storage and return fileData links to reduce API response bandwidth.": "Сохраняет крупные изображения Gemini inlineData в объектное хранилище и возвращает ссылки fileData, чтобы снизить трафик API-ответов.",
+    "Store large Gemini inlineData and OpenAI b64_json images in object storage, returning fileData or URL links to reduce API response bandwidth.": "Сохраняет крупные изображения Gemini inlineData и OpenAI b64_json в объектном хранилище и возвращает ссылки fileData или URL, снижая трафик API-ответов.",
     "Stored value is not echoed back for security": "В целях безопасности сохранённое значение не отображается",
     "stream": "Поток",
     "Stream": "Поток",

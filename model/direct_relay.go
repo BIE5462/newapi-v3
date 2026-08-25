@@ -60,6 +60,7 @@ type DirectRelayTicket struct {
 	AttemptID              string               `json:"attempt_id" gorm:"type:varchar(96);uniqueIndex"`
 	RequestID              string               `json:"request_id" gorm:"type:varchar(96);index"`
 	UserID                 int                  `json:"user_id" gorm:"index"`
+	Username               string               `json:"username" gorm:"type:varchar(128)"`
 	TokenID                int                  `json:"token_id" gorm:"index"`
 	TokenKey               string               `json:"-" gorm:"type:text"`
 	TokenName              string               `json:"token_name" gorm:"type:varchar(128)"`

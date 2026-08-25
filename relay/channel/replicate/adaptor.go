@@ -257,7 +257,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	if wantsBase64 {
 		converted, convErr := downloadImagesToBase64(urls)
 		if convErr != nil {
-			return nil, types.NewError(convErr, types.ErrorCodeBadResponse)
+			return nil, types.NewError(convErr, types.ErrorCodeBadResponse, types.ErrOptionWithUnmaskedErrorMessage())
 		}
 		for _, content := range converted {
 			if content == "" {

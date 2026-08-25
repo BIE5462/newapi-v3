@@ -36,6 +36,7 @@ export default function SettingsGeminiDirectRelay({ options, refresh }) {
   const [loading, setLoading] = useState(false);
   const defaults = {
     GeminiDirectRelayEnabled: false,
+    GeminiDirectRelayGlobalEnabled: false,
     GeminiDirectTicketTTLSeconds: 600,
     GeminiDirectCallbackGraceSeconds: 1800,
   };
@@ -45,6 +46,9 @@ export default function SettingsGeminiDirectRelay({ options, refresh }) {
   useEffect(() => {
     const next = {
       GeminiDirectRelayEnabled: toBoolean(options?.GeminiDirectRelayEnabled),
+      GeminiDirectRelayGlobalEnabled: toBoolean(
+        options?.GeminiDirectRelayGlobalEnabled,
+      ),
       GeminiDirectTicketTTLSeconds: Number(
         options?.GeminiDirectTicketTTLSeconds || 600,
       ),
@@ -111,6 +115,16 @@ export default function SettingsGeminiDirectRelay({ options, refresh }) {
               />
             </Col>
             <Col xs={24} sm={12} md={8}>
+              <Form.Switch
+                field='GeminiDirectRelayGlobalEnabled'
+                label={t('启用 Gemini 全局直连')}
+                extraText={t(
+                  '开启后，在服务端总开关启用的前提下，无需在用户编辑页单独启用直连，所有符合要求的用户都会使用直连模式',
+                )}
+                onChange={update('GeminiDirectRelayGlobalEnabled')}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8}>
               <Form.InputNumber
                 field='GeminiDirectTicketTTLSeconds'
                 label={t('直连票据有效期（秒）')}
@@ -131,7 +145,7 @@ export default function SettingsGeminiDirectRelay({ options, refresh }) {
           </Row>
           <Text type='tertiary'>
             {t(
-              '仅支持原生 Gemini 非流式 generateContent 和无服务端 Proxy 的图像模型；不支持流式、Imagen predict、Vertex Service Account。管理员还需要在用户编辑页为具体用户启用直连。客户端会直接使用上游 API Key，回调失败会重试，超时未回调会退款。',
+              '仅支持原生 Gemini 非流式 generateContent 和无服务端 Proxy 的图像模型；不支持流式、Imagen predict、Vertex Service Account。关闭全局直连时，管理员还需要在用户编辑页为具体用户启用直连。客户端会直接使用上游 API Key，回调失败会重试，超时未回调会退款。',
             )}
           </Text>
           <Text type='tertiary' style={{ display: 'block', marginTop: 8 }}>

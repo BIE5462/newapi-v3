@@ -416,7 +416,10 @@ export const useLogsData = () => {
 
       if (
         isAdminUser &&
-        (logs[i].type === 0 || logs[i].type === 2 || logs[i].type === 6)
+        (logs[i].type === 0 ||
+          logs[i].type === 2 ||
+          logs[i].type === 5 ||
+          logs[i].type === 6)
       ) {
         expandDataLocal.push({
           key: t('渠道信息'),
@@ -427,6 +430,12 @@ export const useLogsData = () => {
         expandDataLocal.push({
           key: t('Request ID'),
           value: logs[i].request_id,
+        });
+      }
+      if (logs[i].upstream_request_id) {
+        expandDataLocal.push({
+          key: t('上游请求 ID'),
+          value: logs[i].upstream_request_id,
         });
       }
       if (other?.ws || other?.audio) {
@@ -545,6 +554,34 @@ export const useLogsData = () => {
             }),
           });
         }
+      }
+      if (logs[i].type === 5) {
+        const errorValueStyle = {
+          maxWidth: 600,
+          whiteSpace: 'pre-line',
+          wordBreak: 'break-word',
+          lineHeight: 1.6,
+        };
+
+        if (logs[i].content) {
+          expandDataLocal.push({
+            key: t('错误详情'),
+            value: <div style={errorValueStyle}>{logs[i].content}</div>,
+          });
+        }
+
+        [
+          [t('状态码'), other?.status_code],
+          [t('错误类型'), other?.error_type],
+          [t('错误代码'), other?.error_code],
+        ].forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            expandDataLocal.push({
+              key,
+              value: <div style={errorValueStyle}>{String(value)}</div>,
+            });
+          }
+        });
       }
       if (logs[i].type === 6) {
         if (other?.task_id) {

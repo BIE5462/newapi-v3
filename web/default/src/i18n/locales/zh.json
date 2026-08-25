@@ -4142,7 +4142,7 @@
     "Store + product created": "店铺和产品已创建",
     "Store ID": "商店 ID",
     "Store ID is required": "商店 ID 为必填项",
-    "Store large Gemini inlineData images in object storage and return fileData links to reduce API response bandwidth.": "将大型 Gemini inlineData 图片存入对象存储，并返回 fileData 链接，以降低 API 响应带宽。",
+    "Store large Gemini inlineData and OpenAI b64_json images in object storage, returning fileData or URL links to reduce API response bandwidth.": "将大型 Gemini inlineData 和 OpenAI b64_json 图片存入对象存储，并返回 fileData 或 URL 链接，以降低 API 响应带宽。",
     "Stored value is not echoed back for security": "出于安全考虑，已存储的值不会回显",
     "stream": "流",
     "Stream": "流",

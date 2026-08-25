@@ -4142,7 +4142,7 @@
     "Store + product created": "Store + product created",
     "Store ID": "Store ID",
     "Store ID is required": "Store ID is required",
-    "Store large Gemini inlineData images in object storage and return fileData links to reduce API response bandwidth.": "Store large Gemini inlineData images in object storage and return fileData links to reduce API response bandwidth.",
+    "Store large Gemini inlineData and OpenAI b64_json images in object storage, returning fileData or URL links to reduce API response bandwidth.": "Store large Gemini inlineData and OpenAI b64_json images in object storage, returning fileData or URL links to reduce API response bandwidth.",
     "Stored value is not echoed back for security": "Stored value is not echoed back for security",
     "stream": "stream",
     "Stream": "Stream",

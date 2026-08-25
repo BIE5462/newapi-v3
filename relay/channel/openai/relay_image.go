@@ -39,11 +39,23 @@ func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
 
-	// 写入新的 response body
-	service.IOCopyBytesGracefully(c, resp, responseBody)
-
 	normalizeOpenAIUsage(&usageResp.Usage)
 	applyUsagePostProcessing(info, &usageResp.Usage, responseBody)
+
+	rewrittenBody, changed, err := offloadOpenAIImageBase64(c, info, responseBody)
+	if err != nil {
+		return nil, types.NewOpenAIError(
+			err,
+			types.ErrorCodeBadResponseBody,
+			http.StatusInternalServerError,
+			types.ErrOptionWithSkipRetry(),
+		)
+	}
+	if changed {
+		responseBody = rewrittenBody
+	}
+
+	service.IOCopyBytesGracefully(c, resp, responseBody)
 	return &usageResp.Usage, nil
 }
 

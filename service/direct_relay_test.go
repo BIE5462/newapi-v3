@@ -66,6 +66,29 @@ func newDirectRelayCallbackContext() *gin.Context {
 	return c
 }
 
+func TestDirectRelayConsumeLogPreservesUsernameAndTokenName(t *testing.T) {
+	setupDirectRelayServiceTestDB(t)
+	originalLogDB := model.LOG_DB
+	model.LOG_DB = model.DB
+	require.NoError(t, model.LOG_DB.AutoMigrate(&model.Log{}))
+	common.LogConsumeEnabled = true
+	t.Cleanup(func() { model.LOG_DB = originalLogDB })
+
+	c := newDirectRelayCallbackContext()
+	ticket := &model.DirectRelayTicket{
+		Username:  "original-user",
+		TokenName: "image-key",
+	}
+
+	SetDirectRelayCallbackContext(c, ticket)
+	recordDirectRelayConsume(c, ticket, &dto.Usage{}, 0, 0)
+
+	var log model.Log
+	require.NoError(t, model.LOG_DB.Last(&log).Error)
+	assert.Equal(t, "original-user", log.Username)
+	assert.Equal(t, "image-key", log.TokenName)
+}
+
 func processDirectRelayErrorCallback(t *testing.T, ticketID, callbackToken, body string, truncated bool, totalBytes int64, hash string) (string, error) {
 	t.Helper()
 	req := &DirectRelayCallbackRequest{
@@ -167,13 +190,16 @@ func TestIsGeminiDirectCandidateEligibility(t *testing.T) {
 		common.OptionMap = make(map[string]string)
 	}
 	originalEnabled := common.OptionMap["GeminiDirectRelayEnabled"]
+	originalGlobalEnabled := common.OptionMap["GeminiDirectRelayGlobalEnabled"]
 	common.OptionMap["GeminiDirectRelayEnabled"] = "true"
+	common.OptionMap["GeminiDirectRelayGlobalEnabled"] = "false"
 	common.OptionMapRWMutex.Unlock()
 	originalThinking := model_setting.GetGeminiSettings().ThinkingAdapterEnabled
 	model_setting.GetGeminiSettings().ThinkingAdapterEnabled = false
 	t.Cleanup(func() {
 		common.OptionMapRWMutex.Lock()
 		common.OptionMap["GeminiDirectRelayEnabled"] = originalEnabled
+		common.OptionMap["GeminiDirectRelayGlobalEnabled"] = originalGlobalEnabled
 		common.OptionMapRWMutex.Unlock()
 		model_setting.GetGeminiSettings().ThinkingAdapterEnabled = originalThinking
 	})
@@ -202,6 +228,27 @@ func TestIsGeminiDirectCandidateEligibility(t *testing.T) {
 	c, info = newCandidate()
 	info.UserSetting.GeminiDirectRelayEnabled = false
 	assert.False(t, IsGeminiDirectCandidate(c, info))
+
+	// The global authorization switch bypasses the user-level switch while
+	// retaining the existing server-wide master switch above.
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap["GeminiDirectRelayGlobalEnabled"] = "true"
+	common.OptionMapRWMutex.Unlock()
+	c, info = newCandidate()
+	info.UserSetting.GeminiDirectRelayEnabled = false
+	assert.True(t, IsGeminiDirectCandidate(c, info))
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap["GeminiDirectRelayEnabled"] = "false"
+	common.OptionMapRWMutex.Unlock()
+	c, info = newCandidate()
+	info.UserSetting.GeminiDirectRelayEnabled = false
+	assert.False(t, IsGeminiDirectCandidate(c, info), "the global authorization switch must not bypass the master switch")
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap["GeminiDirectRelayEnabled"] = "true"
+	common.OptionMapRWMutex.Unlock()
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap["GeminiDirectRelayGlobalEnabled"] = "false"
+	common.OptionMapRWMutex.Unlock()
 
 	c, info = newCandidate()
 	info.ChannelBaseUrl = "http://localhost:8080"
@@ -273,6 +320,7 @@ func TestCreateDirectRelayTicketPreservesMappedModel(t *testing.T) {
 
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/original-alias:generateContent", nil)
+	c.Set("username", "original-user")
 	info := &relaycommon.RelayInfo{
 		RequestId:       "rim-ticket-request",
 		OriginModelName: "original-alias",
@@ -292,6 +340,10 @@ func TestCreateDirectRelayTicketPreservesMappedModel(t *testing.T) {
 	ticket, err := CreateDirectRelayTicket(c, info, []byte(`{"contents":[]}`))
 	require.NoError(t, err)
 	require.NotNil(t, ticket)
+	storedTicket, err := model.GetDirectRelayTicket(ticket.TicketID)
+	require.NoError(t, err)
+	require.NotNil(t, storedTicket)
+	assert.Equal(t, "original-user", storedTicket.Username)
 	decodedModel, err := base64.RawURLEncoding.DecodeString(ticket.Upstream.ModelB64)
 	require.NoError(t, err)
 	assert.Equal(t, "「Rim」gemini-2.5-flash-image", string(decodedModel))
