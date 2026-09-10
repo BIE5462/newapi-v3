@@ -95,6 +95,8 @@ const EditUserModal = (props) => {
     group: 'default',
     remark: '',
     gemini_direct_relay_enabled: false,
+    token_limit_enabled: false,
+    token_limit: 1,
   });
 
   const fetchGroups = async () => {
@@ -115,6 +117,9 @@ const EditUserModal = (props) => {
     const { success, message, data } = res.data;
     if (success) {
       data.password = '';
+      const tokenLimit = Number(data.token_limit);
+      data.token_limit =
+        Number.isInteger(tokenLimit) && tokenLimit > 0 ? tokenLimit : 1;
       data.quota_amount = Number(
         quotaToDisplayAmount(data.quota || 0).toFixed(6),
       );
@@ -380,6 +385,44 @@ const EditUserModal = (props) => {
                           extraText={t('关闭或条件不满足时自动使用服务器中转')}
                         />
                       </Col>
+
+                      <Col span={24}>
+                        <Form.Switch
+                          field='token_limit_enabled'
+                          label={t('限制令牌数量')}
+                          extraText={t(
+                            '开启后，该用户创建的令牌数量不能超过设定上限',
+                          )}
+                        />
+                      </Col>
+
+                      {values.token_limit_enabled && (
+                        <Col span={24}>
+                          <Form.InputNumber
+                            field='token_limit'
+                            label={t('令牌数量上限')}
+                            placeholder={t('请输入令牌数量上限')}
+                            min={1}
+                            step={1}
+                            precision={0}
+                            style={{ width: '100%' }}
+                            extraText={t(
+                              '实际生效上限不会超过系统设置的用户最大令牌数量',
+                            )}
+                            rules={[
+                              {
+                                required: true,
+                                message: t('请输入令牌数量上限'),
+                              },
+                              {
+                                type: 'number',
+                                min: 1,
+                                message: t('令牌数量上限必须大于 0'),
+                              },
+                            ]}
+                          />
+                        </Col>
+                      )}
 
                       <Col span={10}>
                         <Form.InputNumber

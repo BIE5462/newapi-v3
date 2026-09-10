@@ -9,7 +9,10 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+var ErrTokenLimitReached = errors.New("token limit reached")
 
 type Token struct {
 	Id                 int            `json:"id"`
@@ -287,6 +290,33 @@ func (token *Token) Insert() error {
 	var err error
 	err = DB.Create(token).Error
 	return err
+}
+
+// InsertWithUserLimit serializes token creation per user and enforces both the
+// system-wide limit and the optional, lower per-user limit.
+func (token *Token) InsertWithUserLimit() (int, error) {
+	effectiveLimit := operation_setting.GetMaxUserTokens()
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("setting").First(&user, token.UserId).Error; err != nil {
+			return err
+		}
+
+		userSetting := user.GetSetting()
+		if userSetting.TokenLimitEnabled && userSetting.TokenLimit < effectiveLimit {
+			effectiveLimit = userSetting.TokenLimit
+		}
+
+		var count int64
+		if err := tx.Model(&Token{}).Where("user_id = ?", token.UserId).Count(&count).Error; err != nil {
+			return err
+		}
+		if count >= int64(effectiveLimit) {
+			return ErrTokenLimitReached
+		}
+		return tx.Create(token).Error
+	})
+	return effectiveLimit, err
 }
 
 // Update Make sure your token's fields is completed, because this will update non-zero values

@@ -45,6 +45,7 @@ const (
 	MsgTokenNameTooLong          = "token.name_too_long"
 	MsgTokenQuotaNegative        = "token.quota_negative"
 	MsgTokenQuotaExceedMax       = "token.quota_exceed_max"
+	MsgTokenCountExceeded        = "token.count_exceeded"
 	MsgTokenGenerateFailed       = "token.generate_failed"
 	MsgTokenGetInfoFailed        = "token.get_info_failed"
 	MsgTokenExpiredCannotEnable  = "token.expired_cannot_enable"
@@ -114,6 +115,7 @@ const (
 	MsgUserTelegramNotBound          = "user.telegram_not_bound"
 	MsgUserLinuxDOIdEmpty            = "user.linux_do_id_empty"
 	MsgUserQuotaChangeZero           = "user.quota_change_zero"
+	MsgUserTokenLimitInvalid         = "user.token_limit_invalid"
 )
 
 // Quota related messages

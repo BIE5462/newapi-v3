@@ -13,9 +13,14 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -387,6 +392,104 @@ func TestTokenMigrationFromChar48ToVarchar128Postgres(t *testing.T) {
 
 	db, managedTokensTable := openTokenControllerExternalDB(t, "postgres", dsn)
 	runTokenMigrationCompatibilityTest(t, db, "postgres", managedTokensTable)
+}
+
+func TestAddTokenEnforcesPerUserLimit(t *testing.T) {
+	require.NoError(t, i18n.Init())
+	originalGlobalLimit := operation_setting.GetMaxUserTokens()
+	t.Cleanup(func() {
+		operation_setting.GetTokenSetting().MaxUserTokens = originalGlobalLimit
+	})
+
+	tests := []struct {
+		name           string
+		globalLimit    int
+		limitEnabled   bool
+		userLimit      int
+		existingTokens int
+		wantSuccess    bool
+		wantCount      int64
+		wantMessage    string
+	}{
+		{
+			name:           "disabled user limit does not block creation",
+			globalLimit:    100,
+			limitEnabled:   false,
+			userLimit:      1,
+			existingTokens: 1,
+			wantSuccess:    true,
+			wantCount:      2,
+		},
+		{
+			name:           "creation below user limit succeeds",
+			globalLimit:    100,
+			limitEnabled:   true,
+			userLimit:      2,
+			existingTokens: 1,
+			wantSuccess:    true,
+			wantCount:      2,
+		},
+		{
+			name:           "creation at user limit is rejected",
+			globalLimit:    100,
+			limitEnabled:   true,
+			userLimit:      2,
+			existingTokens: 2,
+			wantSuccess:    false,
+			wantCount:      2,
+			wantMessage:    "Maximum token count reached (2)",
+		},
+		{
+			name:           "system limit remains the upper bound",
+			globalLimit:    2,
+			limitEnabled:   true,
+			userLimit:      5,
+			existingTokens: 2,
+			wantSuccess:    false,
+			wantCount:      2,
+			wantMessage:    "Maximum token count reached (2)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			operation_setting.GetTokenSetting().MaxUserTokens = tt.globalLimit
+			db := openTokenControllerTestDB(t)
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}))
+
+			user := model.User{
+				Id:       1,
+				Username: "token-limit-user",
+				Password: "password",
+				Role:     common.RoleCommonUser,
+				Status:   common.UserStatusEnabled,
+			}
+			user.SetSetting(dto.UserSetting{
+				TokenLimitEnabled: tt.limitEnabled,
+				TokenLimit:        tt.userLimit,
+			})
+			require.NoError(t, db.Create(&user).Error)
+
+			for index := 0; index < tt.existingTokens; index++ {
+				seedToken(t, db, user.Id, fmt.Sprintf("existing-%d", index), fmt.Sprintf("key-%d", index))
+			}
+
+			ctx, recorder := newAuthenticatedContext(t, http.MethodPost, "/api/token/", map[string]any{
+				"name":            "new-token",
+				"unlimited_quota": true,
+			}, user.Id)
+			AddToken(ctx)
+
+			response := decodeAPIResponse(t, recorder)
+			assert.Equal(t, tt.wantSuccess, response.Success)
+			if tt.wantMessage != "" {
+				assert.Equal(t, tt.wantMessage, response.Message)
+			}
+			count, err := model.CountUserTokens(user.Id)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantCount, count)
+		})
+	}
 }
 
 func TestGetAllTokensMasksKeyInResponse(t *testing.T) {

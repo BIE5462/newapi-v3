@@ -33,6 +33,7 @@ services:
       - RELAY_MAX_IDLE_CONNS_PER_HOST=${RELAY_MAX_IDLE_CONNS_PER_HOST:-100}
       - ENABLE_PPROF=true
       - GEMINI_IMAGE_TRACE_ENABLED=${GEMINI_IMAGE_TRACE_ENABLED:-false}
+      - TASK_PRICE_PATCH=${TASK_PRICE_PATCH:-grok-1.5-video,veo_3_1-fast,veo_3_1-components,veo_3_1}
     depends_on:
       - redis
       - mysql

@@ -336,8 +336,13 @@ func GetUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
 		return
 	}
-	geminiDirectRelayEnabled := user.GetSetting().GeminiDirectRelayEnabled
+	userSetting := user.GetSetting()
+	geminiDirectRelayEnabled := userSetting.GeminiDirectRelayEnabled
 	user.GeminiDirectRelayEnabled = &geminiDirectRelayEnabled
+	tokenLimitEnabled := userSetting.TokenLimitEnabled
+	tokenLimit := userSetting.TokenLimit
+	user.TokenLimitEnabled = &tokenLimitEnabled
+	user.TokenLimit = &tokenLimit
 	user.AdminPermissions = authz.Capabilities(user.Id, user.Role)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -659,15 +664,31 @@ func UpdateUser(c *gin.Context) {
 		updatedUser.Password = "" // rollback to what it should be
 	}
 	updatePassword := updatedUser.Password != ""
+	userSetting := originUser.GetSetting()
+	userSettingTouched := false
+	if updatedUser.GeminiDirectRelayEnabled != nil {
+		userSetting.GeminiDirectRelayEnabled = *updatedUser.GeminiDirectRelayEnabled
+		userSettingTouched = true
+	}
+	if updatedUser.TokenLimitEnabled != nil {
+		userSetting.TokenLimitEnabled = *updatedUser.TokenLimitEnabled
+		userSettingTouched = true
+	}
+	if updatedUser.TokenLimit != nil {
+		userSetting.TokenLimit = *updatedUser.TokenLimit
+		userSettingTouched = true
+	}
+	if userSettingTouched && userSetting.TokenLimitEnabled && userSetting.TokenLimit <= 0 {
+		common.ApiErrorI18n(c, i18n.MsgUserTokenLimitInvalid)
+		return
+	}
 	authzTouched := false
 	if err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := updatedUser.EditWithTx(tx, updatePassword); err != nil {
 			return err
 		}
-		if updatedUser.GeminiDirectRelayEnabled != nil {
-			setting := originUser.GetSetting()
-			setting.GeminiDirectRelayEnabled = *updatedUser.GeminiDirectRelayEnabled
-			data, marshalErr := common.Marshal(setting)
+		if userSettingTouched {
+			data, marshalErr := common.Marshal(userSetting)
 			if marshalErr != nil {
 				return marshalErr
 			}

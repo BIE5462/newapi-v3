@@ -17,6 +17,8 @@ type UserSetting struct {
 	BillingPreference                string  `json:"billing_preference,omitempty"`                   // BillingPreference 扣费策略（订阅/钱包）
 	Language                         string  `json:"language,omitempty"`                             // Language 用户语言偏好 (zh, en)
 	GeminiDirectRelayEnabled         bool    `json:"gemini_direct_relay_enabled,omitempty"`          // 是否允许该用户使用 Gemini 图像直连
+	TokenLimitEnabled                bool    `json:"token_limit_enabled,omitempty"`                  // 是否限制该用户创建的令牌数量
+	TokenLimit                       int     `json:"token_limit,omitempty"`                          // 该用户最多可创建的令牌数量
 }
 
 var (

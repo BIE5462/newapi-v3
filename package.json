@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "hexo-renderer-stylus": "^3.0.1"
+  }
+}
