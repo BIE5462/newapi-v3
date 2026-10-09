@@ -492,7 +492,7 @@ func ProcessDirectRelayCallback(c *gin.Context, req *DirectRelayCallbackRequest,
 			return recordDirectRelayCallbackConflict(ticket, req)
 		}
 		if ticket.Status == model.DirectRelayTicketRefunded {
-			if err := persistDirectRelayFailureAudit(c, ticket, req); err != nil {
+			if err := persistDirectRelayFailureAudit(c, ticket, req, "upstream_error"); err != nil {
 				return "", &DirectRelaySettlementError{Err: err}
 			}
 		}
@@ -503,7 +503,7 @@ func ProcessDirectRelayCallback(c *gin.Context, req *DirectRelayCallbackRequest,
 			return "", &DirectRelaySettlementError{Err: err}
 		} else {
 			if req.Outcome == "error" {
-				if err := persistDirectRelayFailureAudit(c, ticket, req); err != nil {
+				if err := persistDirectRelayFailureAudit(c, ticket, req, "upstream_error"); err != nil {
 					return "", &DirectRelaySettlementError{Err: err}
 				}
 			}
@@ -514,7 +514,19 @@ func ProcessDirectRelayCallback(c *gin.Context, req *DirectRelayCallbackRequest,
 		if ticket.Status != model.DirectRelayTicketIssued && ticket.Status != model.DirectRelayTicketRefunding {
 			return recordDirectRelayCallbackConflict(ticket, req)
 		}
-		return finalizeDirectRelayRefund(c, ticket, req)
+		return finalizeDirectRelayRefund(c, ticket, req, "upstream_error")
+	}
+	// Gemini returns HTTP 200 with promptFeedback.blockReason (for example
+	// PROHIBITED_CONTENT) and no candidates array when generation is blocked.
+	// The client classifies the outcome by HTTP status only, so such responses
+	// arrive here as success callbacks with candidate_count == 0. For a
+	// per-call billed image model that is a failed generation: refund the
+	// reserve instead of settling the frozen per-call price.
+	if req.CandidateCount == 0 {
+		if ticket.Status != model.DirectRelayTicketIssued && ticket.Status != model.DirectRelayTicketSettling {
+			return recordDirectRelayCallbackConflict(ticket, req)
+		}
+		return finalizeDirectRelayRefund(c, ticket, req, "no_candidates")
 	}
 	if ticket.Status != model.DirectRelayTicketIssued && ticket.Status != model.DirectRelayTicketSettling {
 		return recordDirectRelayCallbackConflict(ticket, req)
@@ -594,7 +606,7 @@ func RefundDirectRelayTicket(ticketID, reason string) error {
 	return err
 }
 
-func finalizeDirectRelayRefund(c *gin.Context, ticket *model.DirectRelayTicket, req *DirectRelayCallbackRequest) (string, error) {
+func finalizeDirectRelayRefund(c *gin.Context, ticket *model.DirectRelayTicket, req *DirectRelayCallbackRequest, reason string) (string, error) {
 	claimed := ticket
 	ok := true
 	var err error
@@ -624,7 +636,7 @@ func finalizeDirectRelayRefund(c *gin.Context, ticket *model.DirectRelayTicket, 
 		}
 		return "", &DirectRelaySettlementError{Err: err}
 	}
-	if err := persistDirectRelayFailureAudit(c, ticket, req); err != nil {
+	if err := persistDirectRelayFailureAudit(c, ticket, req, reason); err != nil {
 		return "", &DirectRelaySettlementError{Err: err}
 	}
 	if row.Status != model.DirectRelaySettlementApplied {
@@ -632,13 +644,13 @@ func finalizeDirectRelayRefund(c *gin.Context, ticket *model.DirectRelayTicket, 
 			return "", &DirectRelaySettlementError{Err: err}
 		}
 	}
-	if err := model.MarkDirectRelayTicketFinal(ticket.TicketID, model.DirectRelayTicketRefunded, 0, "upstream_error"); err != nil {
+	if err := model.MarkDirectRelayTicketFinal(ticket.TicketID, model.DirectRelayTicketRefunded, 0, reason); err != nil {
 		return "", &DirectRelaySettlementError{Err: err}
 	}
 	return model.DirectRelayTicketRefunded, nil
 }
 
-func persistDirectRelayFailureAudit(c *gin.Context, ticket *model.DirectRelayTicket, req *DirectRelayCallbackRequest) error {
+func persistDirectRelayFailureAudit(c *gin.Context, ticket *model.DirectRelayTicket, req *DirectRelayCallbackRequest, reason string) error {
 	// Error callbacks are retried by the client. The first complete audit
 	// payload must win, otherwise a later retry with a different error could
 	// make the stored audit disagree with the already-applied refund.
@@ -649,7 +661,7 @@ func persistDirectRelayFailureAudit(c *gin.Context, ticket *model.DirectRelayTic
 		"error_body_sha256":    req.ErrorBodySHA256,
 		"error_body_truncated": req.ErrorBodyTruncated,
 		"upstream_status":      req.UpstreamStatus,
-		"failure_reason":       "upstream_error",
+		"failure_reason":       reason,
 		"upstream_request_id":  req.UpstreamRequestID,
 		"elapsed_ms":           req.ElapsedMS,
 	}).Error; updateErr != nil {

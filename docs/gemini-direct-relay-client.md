@@ -148,6 +148,8 @@ callback token 是票据专用凭据。服务端只保存 hash，并使用常量
 
 客户端不提交最终 quota。服务端使用票据创建时冻结的价格、分组、模型映射、tiered billing 表达式和预扣额度结算。`usage_metadata` 完整可解析时，服务端按 Gemini 中转相同的 usage 归一化规则计费；缺失或无法解析时按冻结的预扣上限结算，并将票据标记为 `usage_missing`。
 
+注意：Gemini 在内容被安全策略拦截（例如 `promptFeedback.blockReason` 为 `PROHIBITED_CONTENT`）时仍返回 HTTP `200`，但响应中没有 `candidates` 数组。客户端仍按 `candidate_count: 0` 如实上报；服务端会把 `outcome: success` 且 `candidate_count` 为 `0` 的回调视为生成失败并全额退款，票据标记为 `no_candidates`，不产生消费日志。
+
 ## 6. 失败回调
 
 失败回调必须保留完整的上游错误正文，最多保留原始前 `1 MiB`：

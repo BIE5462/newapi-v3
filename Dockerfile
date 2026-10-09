@@ -1,4 +1,4 @@
-ARG BUN_IMAGE=oven/bun:1@sha256:0733e50325078969732ebe3b15ce4c4be5082f18c4ac1a0f0ca4839c2e4e42a7
+ARG BUN_IMAGE=oven/bun:1
 
 FROM ${BUN_IMAGE} AS builder
 
